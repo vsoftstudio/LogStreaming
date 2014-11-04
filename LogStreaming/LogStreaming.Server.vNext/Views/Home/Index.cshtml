@@ -1,0 +1,106 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Log tracker</title>
+    <script src="~/Scripts/jquery-2.1.1.min.js"></script>
+    <script src="~/Scripts/jquery.signalR-2.1.2.min.js"></script>
+    <script src="~/signalr/hubs" type="text/javascript"></script>
+    <script type="text/javascript">
+        var guid = (function () {
+            function s4() {
+                return Math.floor((1 + Math.random()) * 0x10000)
+                           .toString(16)
+                           .substring(1);
+            }
+            return function () {
+                return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+                       s4() + '-' + s4() + s4() + s4();
+            };
+        })();
+
+        $(function () {
+            var clientId = guid();
+
+            $.connection.hub.logging = true;
+            var logsHub = $.connection.logs;
+            var content = $('#content');
+            var btnStop = $('#stop');
+            var fileList = $('#fileList');
+            var filePath = $('#filePath');
+
+            btnStop.attr("disabled", "disabled");
+            filePath.hide();
+
+            function wireEvents() {
+                $('#fileList > li > a').click(function () {
+                    content.empty();
+                    var fileName = $(this).text();
+                    logsHub.server.subscribe(clientId, fileName);
+
+                    fileList.hide();
+                    btnStop.removeAttr("disabled");
+                    filePath.show();
+                    filePath.text(fileName);
+
+                    return false;
+                });
+            }
+
+            btnStop.click(function () {
+                logsHub.server.unsubscribe(clientId);
+                filePath.hide();
+                btnStop.attr("disabled", "disabled");
+            });
+
+            logsHub.client.alert = function (message) {
+                alert(message);
+            }
+
+            logsHub.client.append = function (data) {
+                content.append(data);
+                if ($('#followTail').val()) {
+                    content.prop({ scrollTop: content.prop("scrollHeight") });
+                }
+            }
+
+            logsHub.client.displayFileList = function (list) {
+                fileList.show();
+                fileList.empty();
+
+                $.each(list, function (index, item) {
+                    fileList.append('<li><a href="3">' + item + '</a></li>');
+                });
+
+                wireEvents();
+            }
+
+            logsHub.client.handleFileCreated = function () {
+                alert('Log file is created!');
+            }
+
+            logsHub.client.handleFileRenamed = function () {
+                alert('Log file is renamed');
+            }
+
+            logsHub.client.handleFileDeleted = function () {
+                content.text('Log file is deleted!');
+            }
+
+            $.connection.hub.start().done(function () {
+                console.log('hub connection open');
+                logsHub.server.fetchFileList();
+            });
+        });
+    </script>
+    <link href="~/Styles/Site.css" rel="stylesheet" />
+</head>
+<body>
+    <ul id="fileList">
+
+    </ul>
+    <p id="filePath"></p>
+    <input id="followTail" type="checkbox" checked /> Follow tail<br />
+    <button id="stop">Stop watching</button>
+    <pre id="content"></pre>
+</body>
+</html>
